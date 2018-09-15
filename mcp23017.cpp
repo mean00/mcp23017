@@ -67,20 +67,6 @@ void myMcp23017::init()
         
         current=this;
 }
-/**
- * 
- * @param pin
- * @param onoff
- */
-void      myMcp23017::digitalWrite(int pin, bool onoff)
-{
-    int msk=1<<pin;
-    if(onoff) 
-        PortBValue|=msk;
-    else 
-        PortBValue&=~msk;
-    writeRegister(MCP23017_OLATB,PortBValue);     
-}
 
 /**
  * \fn start
@@ -95,18 +81,34 @@ void myMcp23017::start()
     
     noInterrupts();        
     pinMode(pinInterrupt,INPUT_PULLUP);
-    attachInterrupt(pinInterrupt,_myInterrupt,CHANGE);    
+    attachInterrupt(pinInterrupt,_myInterrupt,FALLING);    
     changed=false;
     interrupts();
+    
 }
 
 
+/**
+ * 
+ * @param pin
+ * @param onoff
+ */
+void      myMcp23017::digitalWrite(int pin, bool onoff)
+{
+    int msk=1<<pin;
+    if(onoff) 
+        PortBValue|=msk;
+    else 
+        PortBValue&=~msk;
+    writeRegister(MCP23017_OLATB,PortBValue);     
+}
 /**
  * 
  */
 void myMcp23017::interrupt()
 {
     changed=true;
+    detachInterrupt(pinInterrupt);    
 }
 /**
  * 
@@ -117,11 +119,12 @@ void myMcp23017::process()
     bool copy=changed;
     changed=false;
     interrupts();
-    
     if(!copy) 
         return;
-    
-    int newValue=readRegister(MCP23017_OLATA);
+    attachInterrupt(pinInterrupt,_myInterrupt,FALLING);    
+    // INTCAPA = value when interrupt occured
+    // GPIOA = value now
+    int newValue=readRegister(MCP23017_GPIOA) ; //MCP23017_INTCAPA);
     if(newValue!=PortALatch)
     {
         printf("Value change %x\n",newValue^PortALatch);
@@ -134,7 +137,7 @@ void myMcp23017::process()
  */
 uint8_t myMcp23017::readRegister(uint8_t addr)
 {
-    // read the current GPINTEN
+    
     wire->beginTransmission(i2cAddress);
     wire->write(addr);
     wire->endTransmission();

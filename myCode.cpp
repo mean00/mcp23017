@@ -38,6 +38,7 @@ void myLoop(void)
     
     pin++;
     mcp->digitalWrite(pin%8,!!(pin&16));
+    mcp->process();
     delay(100);
     
 #endif

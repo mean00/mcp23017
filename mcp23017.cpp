@@ -16,24 +16,117 @@
 #include "mcp23017.h"
 #include "mcp23017_internal.h"
 
-#define wiresend(x) wire->write((uint8_t) x)
-#define wirerecv()  wire->read()
+static myMcp23017 *current=NULL;
 
-
-/**
- * Bit number associated to a give Pin
- */
-uint8_t myMcp23017::bitForPin(uint8_t pin)
+static void _myInterrupt()
 {
-	return pin%8;
+    if(!current) 
+        return;
+    current->interrupt();
 }
 
 /**
- * Register address, port dependent, for a given PIN
+ * 
+ * @param ctor
+ * @param pinInterrupt : Pin that send input change (A0...A7)
+ * @param Address : A2A1A0 , default is zero, real i2c address is 0x20+addr
+ * @param w       : Wire interface, null uses Wire i.e. default i2c
  */
-uint8_t myMcp23017::regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr)
+myMcp23017::myMcp23017(int pinInterrupt,uint8_t addr, WireBase *w)
 {
-	return(pin<8) ?portAaddr:portBaddr;
+    i2cAddress=(addr%8)+MCP23017_BASE_ADDRESS;
+    wire=w;
+    this->pinInterrupt=pinInterrupt;
+    if(!wire)
+        wire=&Wire;    
+    init();
+}
+
+/**
+ * \fn init
+ * \brief set default sane value for most configuration
+ */
+
+void myMcp23017::init() 
+{
+
+	// set defaults:
+	// "A" Pins are all input, "B" pins are all outputs
+	writeRegister(MCP23017_IODIRA,0xff);
+        // and all pullup
+        writeRegister(MCP23017_GPPUA,0xff);
+        writeRegister(MCP23017_OLATA,0xff);
+        PortALatch=0xff;
+        
+        
+        // B are all outputs
+	writeRegister(MCP23017_IODIRB,0);
+	// set to gnd by default
+        writeRegister(MCP23017_OLATB,0);
+        PortBValue=0;
+        
+        current=this;
+}
+/**
+ * 
+ * @param pin
+ * @param onoff
+ */
+void      myMcp23017::digitalWrite(int pin, bool onoff)
+{
+    int msk=1<<pin;
+    if(onoff) 
+        PortBValue|=msk;
+    else 
+        PortBValue&=~msk;
+    writeRegister(MCP23017_OLATB,PortBValue);     
+}
+
+/**
+ * \fn start
+ * \brief start the interrupt system
+ */
+void myMcp23017::start()
+{
+    // All interrupt on change for all A
+    writeRegister(MCP23017_GPINTENA,0xff);
+    // And use previous value
+    writeRegister(MCP23017_INTCONA,0);
+    
+    noInterrupts();        
+    pinMode(pinInterrupt,INPUT_PULLUP);
+    attachInterrupt(pinInterrupt,_myInterrupt,CHANGE);    
+    changed=false;
+    interrupts();
+}
+
+
+/**
+ * 
+ */
+void myMcp23017::interrupt()
+{
+    changed=true;
+}
+/**
+ * 
+ */
+void myMcp23017::process()
+{
+    noInterrupts();       
+    bool copy=changed;
+    changed=false;
+    interrupts();
+    
+    if(!copy) 
+        return;
+    
+    int newValue=readRegister(MCP23017_OLATA);
+    if(newValue!=PortALatch)
+    {
+        printf("Value change %x\n",newValue^PortALatch);
+    }
+    PortALatch=newValue;
 }
 
 /**
@@ -41,12 +134,12 @@ uint8_t myMcp23017::regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr)
  */
 uint8_t myMcp23017::readRegister(uint8_t addr)
 {
-	// read the current GPINTEN
-	wire->beginTransmission(i2cAddress);
-	wiresend(addr);
-	wire->endTransmission();
-	wire->requestFrom(i2cAddress, 1);
-	return wirerecv();
+    // read the current GPINTEN
+    wire->beginTransmission(i2cAddress);
+    wire->write(addr);
+    wire->endTransmission();
+    wire->requestFrom(i2cAddress, 1);
+    return wire->read();
 }
 
 
@@ -55,226 +148,14 @@ uint8_t myMcp23017::readRegister(uint8_t addr)
  */
 void myMcp23017::writeRegister(uint8_t regAddr, uint8_t regValue)
 {
-	// Write the register
-	wire->beginTransmission(i2cAddress);
-	wiresend(regAddr);
-	wiresend(regValue);
-	wire->endTransmission();
+    // Write the register
+    uint8_t txBuffer[2]={regAddr,regValue};
+    wire->beginTransmission(i2cAddress);
+    wire->write(txBuffer,2);
+    wire->endTransmission();
 }
 
 
-/**
- * Helper to update a single bit of an A/B register.
- * - Reads the current register value
- * - Writes the new register value
- */
-void myMcp23017::updateRegisterBit(uint8_t pin, uint8_t pValue, uint8_t portAaddr, uint8_t portBaddr) 
-{
-	uint8_t regValue;
-	uint8_t regAddr=regForPin(pin,portAaddr,portBaddr);
-	uint8_t bit=bitForPin(pin);
-	regValue = readRegister(regAddr);
-
-	// set the value for the particular bit
-	bitWrite(regValue,bit,pValue);
-
-	writeRegister(regAddr,regValue);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-
-myMcp23017::myMcp23017(uint8_t addr, WireBase *w)
-{
-    i2cAddress=(addr%8)+MCP23017_BASE_ADDRESS;
-    wire=w;
-    if(!wire)
-        wire=&Wire;
-}
-
-/**
- * Initializes the MCP23017 given its HW selected address, see datasheet for Address selection.
- */
-void myMcp23017::begin() 
-{
-
-	// set defaults:
-	// "A" Pins are all input, "B" pins are all outputs
-	writeRegister(MCP23017_IODIRA,0xff);
-	writeRegister(MCP23017_IODIRB,0);
-        // and all pullup
-        writeRegister(MCP23017_GPPUA,0xff);
-	// set to gnd by default
-        writeRegister(MCP23017_OLATB,0);
-        
-
-}
-
-/**
- * Sets the pin mode to either INPUT or OUTPUT
- */
-void myMcp23017::pinMode(uint8_t p, uint8_t d) 
-{
-	updateRegisterBit(p,(d==INPUT),MCP23017_IODIRA,MCP23017_IODIRB);
-}
-
-/**
- * Reads all 16 pins (port A and B) into a single 16 bits variable.
- */
-uint16_t myMcp23017::readGPIOAB() 
-{
-	uint16_t ba = 0;
-	uint8_t a;
-
-	// read the current GPIO output latches
-	wire->beginTransmission(i2cAddress);
-	wiresend(MCP23017_GPIOA);
-	wire->endTransmission();
-
-	wire->requestFrom(i2cAddress, 2);
-	a = wirerecv();
-	ba = wirerecv();
-	ba <<= 8;
-	ba |= a;
-
-	return ba;
-}
-
-/**
- * Read a single port, A or B, and return its current 8 bit value.
- * Parameter b should be 0 for GPIOA, and 1 for GPIOB.
- */
-uint8_t myMcp23017::readGPIO(uint8_t b) 
-{
-
-	// read the current GPIO output latches
-	wire->beginTransmission(i2cAddress);
-	if (b == 0)
-		wiresend(MCP23017_GPIOA);
-	else {
-		wiresend(MCP23017_GPIOB);
-	}
-	wire->endTransmission();
-
-	wire->requestFrom(i2cAddress, 1);
-	return wirerecv();
-}
-
-/**
- * Writes all the pins in one go. This method is very useful if you are implementing a multiplexed matrix and want to get a decent refresh rate.
- */
-void myMcp23017::writeGPIOAB(uint16_t ba) 
-{
-	wire->beginTransmission(i2cAddress);
-	wiresend(MCP23017_GPIOA);
-	wiresend(ba & 0xFF);
-	wiresend(ba >> 8);
-	wire->endTransmission();
-}
-
-void myMcp23017::digitalWrite(uint8_t pin, uint8_t d) {
-	uint8_t gpio;
-	uint8_t bit=bitForPin(pin);
-
-
-	// read the current GPIO output latches
-	uint8_t regAddr=regForPin(pin,MCP23017_OLATA,MCP23017_OLATB);
-	gpio = readRegister(regAddr);
-
-	// set the pin and direction
-	bitWrite(gpio,bit,d);
-
-	// write the new GPIO
-	regAddr=regForPin(pin,MCP23017_GPIOA,MCP23017_GPIOB);
-	writeRegister(regAddr,gpio);
-}
-
-void myMcp23017::pullUp(uint8_t p, uint8_t d) 
-{
-	updateRegisterBit(p,d,MCP23017_GPPUA,MCP23017_GPPUB);
-}
-
-uint8_t myMcp23017::digitalRead(uint8_t pin) 
-{
-	uint8_t bit=bitForPin(pin);
-	uint8_t regAddr=regForPin(pin,MCP23017_GPIOA,MCP23017_GPIOB);
-	return (readRegister(regAddr) >> bit) & 0x1;
-}
-
-/**
- * Configures the interrupt system. both port A and B are assigned the same configuration.
- * Mirroring will OR both INTA and INTB pins.
- * Opendrain will set the INT pin to value or open drain.
- * polarity will set LOW or HIGH on interrupt.
- * Default values after Power On Reset are: (false,flase, LOW)
- * If you are connecting the INTA/B pin to arduino 2/3, you should configure the interupt handling as FALLING with
- * the default configuration.
- */
-void myMcp23017::setupInterrupts(uint8_t mirroring, uint8_t openDrain, uint8_t polarity)
-{
-	// configure the port A
-	uint8_t ioconfValue=readRegister(MCP23017_IOCONA);
-	bitWrite(ioconfValue,6,mirroring);
-	bitWrite(ioconfValue,2,openDrain);
-	bitWrite(ioconfValue,1,polarity);
-	writeRegister(MCP23017_IOCONA,ioconfValue);
-
-	// Configure the port B
-	ioconfValue=readRegister(MCP23017_IOCONB);
-	bitWrite(ioconfValue,6,mirroring);
-	bitWrite(ioconfValue,2,openDrain);
-	bitWrite(ioconfValue,1,polarity);
-	writeRegister(MCP23017_IOCONB,ioconfValue);
-}
-
-/**
- * Set's up a pin for interrupt. uses arduino MODEs: CHANGE, FALLING, RISING.
- *
- * Note that the interrupt condition finishes when you read the information about the port / value
- * that caused the interrupt or you read the port itself. Check the datasheet can be confusing.
- *
- */
-void myMcp23017::setupInterruptPin(uint8_t pin, uint8_t mode) 
-{
-
-	// set the pin interrupt control (0 means change, 1 means compare against given value);
-	updateRegisterBit(pin,(mode!=CHANGE),MCP23017_INTCONA,MCP23017_INTCONB);
-	// if the mode is not CHANGE, we need to set up a default value, different value triggers interrupt
-
-	// In a RISING interrupt the default value is 0, interrupt is triggered when the pin goes to 1.
-	// In a FALLING interrupt the default value is 1, interrupt is triggered when pin goes to 0.
-	updateRegisterBit(pin,(mode==FALLING),MCP23017_DEFVALA,MCP23017_DEFVALB);
-
-	// enable the pin for interrupt
-	updateRegisterBit(pin,HIGH,MCP23017_GPINTENA,MCP23017_GPINTENB);
-
-}
-
-uint8_t myMcp23017::getLastInterruptPin()
-{
-	uint8_t intf;
-
-	// try port A
-	intf=readRegister(MCP23017_INTFA);
-	for(int i=0;i<8;i++) if (bitRead(intf,i)) return i;
-
-	// try port B
-	intf=readRegister(MCP23017_INTFB);
-	for(int i=0;i<8;i++) if (bitRead(intf,i)) return i+8;
-
-	return MCP23017_INT_ERR;
-
-}
-uint8_t myMcp23017::getLastInterruptPinValue()
-{
-	uint8_t intPin=getLastInterruptPin();
-	if(intPin!=MCP23017_INT_ERR){
-		uint8_t intcapreg=regForPin(intPin,MCP23017_INTCAPA,MCP23017_INTCAPB);
-		uint8_t bit=bitForPin(intPin);
-		return (readRegister(intcapreg)>>bit) & (0x01);
-	}
-
-	return MCP23017_INT_ERR;
-}
+// EOF
 
 

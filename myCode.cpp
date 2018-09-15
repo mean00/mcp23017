@@ -15,8 +15,12 @@ void mySetup()
     Wire.begin();
     Serial.begin(57600);
     Serial.println("Init"); 
-    mcp=new myMcp23017();
-    mcp->begin();
+    mcp=new myMcp23017(PA2);
+    // continue init here
+    
+    // then go
+    mcp->start();
+    
 }
 /**
  */
@@ -25,11 +29,17 @@ void mySetup()
 
 void myLoop(void) 
 {
+#if 0
     static uint16_t val;
-    val=mcp->readGPIOAB();
-    Serial.print("Val");
-    Serial.println(val);
-    delay(500);
-
+    mcp->process();
+    delay(10);
+#else
+    static int pin=0;
+    
+    pin++;
+    mcp->digitalWrite(pin%8,!!(pin&16));
+    delay(100);
+    
+#endif
 }
 //-

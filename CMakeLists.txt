@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 2.8)
 Project("Hello_stm32" C CXX ASM)
 
 print_board_list()
-ADD_DEFINITIONS("-g3")
+ADD_DEFINITIONS("-g3 -O0")
 
 set(ARDUINO_DEFAULT_BOARD genericSTM32F103C)        # Default Board ID, when not specified
 set(ARDUINO_DEFAULT_PORT ttyACM19) # Default Port, when not specified

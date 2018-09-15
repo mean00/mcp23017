@@ -1,3 +1,12 @@
+/**
+    This is a library for the MCP23017 i2c port expander
+    It is derived from the adafruit one with the following change :
+        * All Axxx port are inputs
+        * All Bxxx ports are outputs
+        * Additional methods to easily manage rotarty encoder and input button
+ 
+ */
+
 /*************************************************** 
   This is a library for the MCP23017 i2c port expander
 
@@ -13,43 +22,48 @@
 #pragma once
 #include <Wire.h>
 
-
+/**
+ * 
+ * @param pinInterrupt
+ * @param addr
+ * @param w
+ */
 class myMcp23017 
 {
 public:
-            myMcp23017(uint8_t addr=0, WireBase *w=NULL);
-  void      begin(void);
+            myMcp23017(int pinInterrupt,uint8_t addr=0, WireBase *w=NULL);
+  void      interrupt();
+  /**
+   * Call this frequently so that the internal events are processed
+   * 
+   */
+  void      process();
+  void      start();
 
-  void      pinMode(uint8_t p, uint8_t d);
-  void      digitalWrite(uint8_t p, uint8_t d);
-  void      pullUp(uint8_t p, uint8_t d);
-  uint8_t   digitalRead(uint8_t p);
+  
+        /**
+         * \fn digitalWrite
+         * @param pin 0..7 matching b0...b7
+         * @param value
+         */
+  void      digitalWrite(int pin, bool onoff);
 
-  void      writeGPIOAB(uint16_t);
-  uint16_t  readGPIOAB();
-  uint8_t   readGPIO(uint8_t b);
 
-  void      setupInterrupts(uint8_t mirroring, uint8_t open, uint8_t polarity);
-  void      setupInterruptPin(uint8_t p, uint8_t mode);
-  uint8_t   getLastInterruptPin();
-  uint8_t   getLastInterruptPinValue();
 
  private: 
 
-  uint8_t   bitForPin(uint8_t pin);
-  uint8_t   regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr);
-
+ 
   uint8_t   readRegister(uint8_t addr);
   void      writeRegister(uint8_t addr, uint8_t value);
 
-  /**
-   * Utility private method to update a register associated with a pin (whether port A/B)
-   * reads its value, updates the particular bit, and writes its value.
-   */
-  void      updateRegisterBit(uint8_t p, uint8_t pValue, uint8_t portAaddr, uint8_t portBaddr);
-
+  
 protected:
+    void      init(void);
     WireBase *wire;
     int      i2cAddress;
+    int      pinInterrupt;
+    int      PortALatch;
+    int      PortBValue;
+    bool     changed;
   
 };

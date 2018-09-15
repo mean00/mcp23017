@@ -12,9 +12,11 @@ myMcp23017 *mcp;
 
 void mySetup() 
 {
-  Serial.println("Init"); 
-  mcp=new myMcp23017();
-  mcp->begin();
+    Wire.begin();
+    Serial.begin(57600);
+    Serial.println("Init"); 
+    mcp=new myMcp23017();
+    mcp->begin();
 }
 /**
  */
@@ -23,7 +25,11 @@ void mySetup()
 
 void myLoop(void) 
 {
-  
+    static uint16_t val;
+    val=mcp->readGPIOAB();
+    Serial.print("Val");
+    Serial.println(val);
+    delay(500);
 
 }
 //-

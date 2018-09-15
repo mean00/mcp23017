@@ -98,7 +98,6 @@ myMcp23017::myMcp23017(uint8_t addr, WireBase *w)
 void myMcp23017::begin() 
 {
 
-	wire->begin();
 	// set defaults:
 	// "A" Pins are all input, "B" pins are all outputs
 	writeRegister(MCP23017_IODIRA,0xff);

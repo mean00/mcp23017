@@ -8,12 +8,13 @@
 #include "SPI.h"
 #include "mcp23017.h"
 
+myMcp23017 *mcp;
+
 void mySetup() 
 {
   Serial.println("Init"); 
-  
-  
-  
+  mcp=new myMcp23017();
+  mcp->begin();
 }
 /**
  */

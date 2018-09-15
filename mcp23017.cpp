@@ -15,40 +15,37 @@
 #include "Arduino.h"
 #include "mcp23017.h"
 #include "mcp23017_internal.h"
-// minihelper to keep Arduino backward compatibility
-static inline void wiresend(uint8_t x) 
-{
-	Wire.write((uint8_t) x);
-}
 
-static inline uint8_t wirerecv(void) 
-{
-	return Wire.read();
-}
+#define wiresend(x) wire->write((uint8_t) x)
+#define wirerecv()  wire->read()
+
 
 /**
  * Bit number associated to a give Pin
  */
-uint8_t myMcp23017::bitForPin(uint8_t pin){
+uint8_t myMcp23017::bitForPin(uint8_t pin)
+{
 	return pin%8;
 }
 
 /**
  * Register address, port dependent, for a given PIN
  */
-uint8_t myMcp23017::regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr){
+uint8_t myMcp23017::regForPin(uint8_t pin, uint8_t portAaddr, uint8_t portBaddr)
+{
 	return(pin<8) ?portAaddr:portBaddr;
 }
 
 /**
  * Reads a given register
  */
-uint8_t myMcp23017::readRegister(uint8_t addr){
+uint8_t myMcp23017::readRegister(uint8_t addr)
+{
 	// read the current GPINTEN
-	Wire.beginTransmission(i2cAddress);
+	wire->beginTransmission(i2cAddress);
 	wiresend(addr);
-	Wire.endTransmission();
-	Wire.requestFrom(i2cAddress, 1);
+	wire->endTransmission();
+	wire->requestFrom(i2cAddress, 1);
 	return wirerecv();
 }
 
@@ -56,12 +53,13 @@ uint8_t myMcp23017::readRegister(uint8_t addr){
 /**
  * Writes a given register
  */
-void myMcp23017::writeRegister(uint8_t regAddr, uint8_t regValue){
+void myMcp23017::writeRegister(uint8_t regAddr, uint8_t regValue)
+{
 	// Write the register
-	Wire.beginTransmission(i2cAddress);
+	wire->beginTransmission(i2cAddress);
 	wiresend(regAddr);
 	wiresend(regValue);
-	Wire.endTransmission();
+	wire->endTransmission();
 }
 
 
@@ -70,7 +68,8 @@ void myMcp23017::writeRegister(uint8_t regAddr, uint8_t regValue){
  * - Reads the current register value
  * - Writes the new register value
  */
-void myMcp23017::updateRegisterBit(uint8_t pin, uint8_t pValue, uint8_t portAaddr, uint8_t portBaddr) {
+void myMcp23017::updateRegisterBit(uint8_t pin, uint8_t pValue, uint8_t portAaddr, uint8_t portBaddr) 
+{
 	uint8_t regValue;
 	uint8_t regAddr=regForPin(pin,portAaddr,portBaddr);
 	uint8_t bit=bitForPin(pin);
@@ -99,33 +98,41 @@ myMcp23017::myMcp23017(uint8_t addr, WireBase *w)
 void myMcp23017::begin() 
 {
 
-	Wire.begin();
-	// set defaults!
-	// all inputs on port A and B
+	wire->begin();
+	// set defaults:
+	// "A" Pins are all input, "B" pins are all outputs
 	writeRegister(MCP23017_IODIRA,0xff);
-	writeRegister(MCP23017_IODIRB,0xff);
+	writeRegister(MCP23017_IODIRB,0);
+        // and all pullup
+        writeRegister(MCP23017_GPPUA,0xff);
+	// set to gnd by default
+        writeRegister(MCP23017_OLATB,0);
+        
+
 }
 
 /**
  * Sets the pin mode to either INPUT or OUTPUT
  */
-void myMcp23017::pinMode(uint8_t p, uint8_t d) {
+void myMcp23017::pinMode(uint8_t p, uint8_t d) 
+{
 	updateRegisterBit(p,(d==INPUT),MCP23017_IODIRA,MCP23017_IODIRB);
 }
 
 /**
  * Reads all 16 pins (port A and B) into a single 16 bits variable.
  */
-uint16_t myMcp23017::readGPIOAB() {
+uint16_t myMcp23017::readGPIOAB() 
+{
 	uint16_t ba = 0;
 	uint8_t a;
 
 	// read the current GPIO output latches
-	Wire.beginTransmission(i2cAddress);
+	wire->beginTransmission(i2cAddress);
 	wiresend(MCP23017_GPIOA);
-	Wire.endTransmission();
+	wire->endTransmission();
 
-	Wire.requestFrom(i2cAddress, 2);
+	wire->requestFrom(i2cAddress, 2);
 	a = wirerecv();
 	ba = wirerecv();
 	ba <<= 8;
@@ -138,30 +145,32 @@ uint16_t myMcp23017::readGPIOAB() {
  * Read a single port, A or B, and return its current 8 bit value.
  * Parameter b should be 0 for GPIOA, and 1 for GPIOB.
  */
-uint8_t myMcp23017::readGPIO(uint8_t b) {
+uint8_t myMcp23017::readGPIO(uint8_t b) 
+{
 
 	// read the current GPIO output latches
-	Wire.beginTransmission(i2cAddress);
+	wire->beginTransmission(i2cAddress);
 	if (b == 0)
 		wiresend(MCP23017_GPIOA);
 	else {
 		wiresend(MCP23017_GPIOB);
 	}
-	Wire.endTransmission();
+	wire->endTransmission();
 
-	Wire.requestFrom(i2cAddress, 1);
+	wire->requestFrom(i2cAddress, 1);
 	return wirerecv();
 }
 
 /**
  * Writes all the pins in one go. This method is very useful if you are implementing a multiplexed matrix and want to get a decent refresh rate.
  */
-void myMcp23017::writeGPIOAB(uint16_t ba) {
-	Wire.beginTransmission(i2cAddress);
+void myMcp23017::writeGPIOAB(uint16_t ba) 
+{
+	wire->beginTransmission(i2cAddress);
 	wiresend(MCP23017_GPIOA);
 	wiresend(ba & 0xFF);
 	wiresend(ba >> 8);
-	Wire.endTransmission();
+	wire->endTransmission();
 }
 
 void myMcp23017::digitalWrite(uint8_t pin, uint8_t d) {
@@ -181,11 +190,13 @@ void myMcp23017::digitalWrite(uint8_t pin, uint8_t d) {
 	writeRegister(regAddr,gpio);
 }
 
-void myMcp23017::pullUp(uint8_t p, uint8_t d) {
+void myMcp23017::pullUp(uint8_t p, uint8_t d) 
+{
 	updateRegisterBit(p,d,MCP23017_GPPUA,MCP23017_GPPUB);
 }
 
-uint8_t myMcp23017::digitalRead(uint8_t pin) {
+uint8_t myMcp23017::digitalRead(uint8_t pin) 
+{
 	uint8_t bit=bitForPin(pin);
 	uint8_t regAddr=regForPin(pin,MCP23017_GPIOA,MCP23017_GPIOB);
 	return (readRegister(regAddr) >> bit) & 0x1;
@@ -200,7 +211,8 @@ uint8_t myMcp23017::digitalRead(uint8_t pin) {
  * If you are connecting the INTA/B pin to arduino 2/3, you should configure the interupt handling as FALLING with
  * the default configuration.
  */
-void myMcp23017::setupInterrupts(uint8_t mirroring, uint8_t openDrain, uint8_t polarity){
+void myMcp23017::setupInterrupts(uint8_t mirroring, uint8_t openDrain, uint8_t polarity)
+{
 	// configure the port A
 	uint8_t ioconfValue=readRegister(MCP23017_IOCONA);
 	bitWrite(ioconfValue,6,mirroring);
@@ -223,7 +235,8 @@ void myMcp23017::setupInterrupts(uint8_t mirroring, uint8_t openDrain, uint8_t p
  * that caused the interrupt or you read the port itself. Check the datasheet can be confusing.
  *
  */
-void myMcp23017::setupInterruptPin(uint8_t pin, uint8_t mode) {
+void myMcp23017::setupInterruptPin(uint8_t pin, uint8_t mode) 
+{
 
 	// set the pin interrupt control (0 means change, 1 means compare against given value);
 	updateRegisterBit(pin,(mode!=CHANGE),MCP23017_INTCONA,MCP23017_INTCONB);
@@ -238,7 +251,8 @@ void myMcp23017::setupInterruptPin(uint8_t pin, uint8_t mode) {
 
 }
 
-uint8_t myMcp23017::getLastInterruptPin(){
+uint8_t myMcp23017::getLastInterruptPin()
+{
 	uint8_t intf;
 
 	// try port A
@@ -252,7 +266,8 @@ uint8_t myMcp23017::getLastInterruptPin(){
 	return MCP23017_INT_ERR;
 
 }
-uint8_t myMcp23017::getLastInterruptPinValue(){
+uint8_t myMcp23017::getLastInterruptPinValue()
+{
 	uint8_t intPin=getLastInterruptPin();
 	if(intPin!=MCP23017_INT_ERR){
 		uint8_t intcapreg=regForPin(intPin,MCP23017_INTCAPA,MCP23017_INTCAPB);

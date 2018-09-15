@@ -23,7 +23,7 @@
   BSD license, all text above must be included in any redistribution
  ****************************************************/
 #pragma once
-#include <Wire.h>
+#include <mcp23017.h>
 
 /**
  * 
@@ -31,21 +31,22 @@
  * @param addr
  * @param w
  */
-class myMcp23017 
+class myMcp23017Impl: public myMcp23017
 {
 public:
-        static myMcp23017 *create(int pinInterrupt, int i2cAdr=0, WireBase *wire=NULL);
+            myMcp23017Impl(int pinInterrupt,uint8_t addr=0, WireBase *w=NULL);
+  void      interrupt();
   /**
    * Call this frequently so that the internal events are processed
    * It is a bad idea to do i2c under interrupt....
    * 
    */
-  virtual void      process()=0;
+  void      process();
   
   /*        
    *   Once you have set it up completely, call this
    */
-  virtual void      start()=0;
+  void      start();
 
   
         /**
@@ -53,13 +54,22 @@ public:
          * @param pin 0..7 matching b0...b7
          * @param value
          */
-  virtual void      digitalWrite(int pin, bool onoff)=0;
+  void      digitalWrite(int pin, bool onoff);
 
+
+
+ private: 
+  uint8_t   readRegister(int addr);
+  void      writeRegister(int addr, int value);
+
+  
 protected:
-            myMcp23017()
-            {
-              
-            }
-
+    void      init(void);
+    WireBase *wire;
+    int      i2cAddress;
+    int      pinInterrupt;
+    int      PortALatch;
+    int      PortBValue;
+    bool     changed;
   
 };

@@ -15,8 +15,21 @@
 #include "Arduino.h"
 #include "mcp23017.h"
 #include "mcp23017_internal.h"
+#include "mcp23017_impl.h"
 
-static myMcp23017 *current=NULL;
+static myMcp23017Impl *current=NULL;
+
+/**
+ * 
+ * @param pinInterrupt
+ * @param i2cAdr
+ * @param wire
+ * @return 
+ */
+myMcp23017 *myMcp23017::create(int pinInterrupt, int i2cAdr, WireBase *wire)
+{
+    return new myMcp23017Impl(pinInterrupt, i2cAdr,wire);
+}
 
 static void _myInterrupt()
 {
@@ -32,7 +45,7 @@ static void _myInterrupt()
  * @param Address : A2A1A0 , default is zero, real i2c address is 0x20+addr
  * @param w       : Wire interface, null uses Wire i.e. default i2c
  */
-myMcp23017::myMcp23017(int pinInterrupt,uint8_t addr, WireBase *w)
+myMcp23017Impl::myMcp23017Impl(int pinInterrupt,uint8_t addr, WireBase *w)
 {
     i2cAddress=(addr%8)+MCP23017_BASE_ADDRESS;
     wire=w;
@@ -47,7 +60,7 @@ myMcp23017::myMcp23017(int pinInterrupt,uint8_t addr, WireBase *w)
  * \brief set default sane value for most configuration
  */
 
-void myMcp23017::init() 
+void myMcp23017Impl::init() 
 {
 
 	// set defaults:
@@ -72,7 +85,7 @@ void myMcp23017::init()
  * \fn start
  * \brief start the interrupt system
  */
-void myMcp23017::start()
+void myMcp23017Impl::start()
 {
     // All interrupt on change for all A
     writeRegister(MCP23017_GPINTENA,0xff);
@@ -93,7 +106,7 @@ void myMcp23017::start()
  * @param pin
  * @param onoff
  */
-void      myMcp23017::digitalWrite(int pin, bool onoff)
+void      myMcp23017Impl::digitalWrite(int pin, bool onoff)
 {
     int msk=1<<pin;
     if(onoff) 
@@ -105,7 +118,7 @@ void      myMcp23017::digitalWrite(int pin, bool onoff)
 /**
  * 
  */
-void myMcp23017::interrupt()
+void myMcp23017Impl::interrupt()
 {
     changed=true;
     detachInterrupt(pinInterrupt);    
@@ -113,7 +126,7 @@ void myMcp23017::interrupt()
 /**
  * 
  */
-void myMcp23017::process()
+void myMcp23017Impl::process()
 {
     noInterrupts();       
     bool copy=changed;
@@ -137,7 +150,7 @@ void myMcp23017::process()
 /**
  * Reads a given register
  */
-uint8_t myMcp23017::readRegister(uint8_t addr)
+uint8_t myMcp23017Impl::readRegister(int addr)
 {
     
     wire->beginTransmission(i2cAddress);
@@ -151,7 +164,7 @@ uint8_t myMcp23017::readRegister(uint8_t addr)
 /**
  * Writes a given register
  */
-void myMcp23017::writeRegister(uint8_t regAddr, uint8_t regValue)
+void myMcp23017Impl::writeRegister(int regAddr, int regValue)
 {
     // Write the register
     uint8_t txBuffer[2]={regAddr,regValue};

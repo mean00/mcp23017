@@ -15,7 +15,7 @@ void mySetup()
     Wire.begin();
     Serial.begin(57600);
     Serial.println("Init"); 
-    mcp=new myMcp23017(PA2);
+    mcp= myMcp23017::create(PA2);
     // continue init here
     
     // then go

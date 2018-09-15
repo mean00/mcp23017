@@ -121,15 +121,17 @@ void myMcp23017::process()
     interrupts();
     if(!copy) 
         return;
-    attachInterrupt(pinInterrupt,_myInterrupt,FALLING);    
-    // INTCAPA = value when interrupt occured
-    // GPIOA = value now
-    int newValue=readRegister(MCP23017_GPIOA) ; //MCP23017_INTCAPA);
+    // Ok an interrupt occured, process it and re-enable the interrupt
+    
+    // MCP23017_INTCAPA = value when interrupt occured
+    // MCP23017_GPIOA = value now
+    int newValue=readRegister(MCP23017_INTCAPA) ; //MCP23017_INTCAPA);
     if(newValue!=PortALatch)
     {
         printf("Value change %x\n",newValue^PortALatch);
     }
     PortALatch=newValue;
+    attachInterrupt(pinInterrupt,_myInterrupt,FALLING);    
 }
 
 /**

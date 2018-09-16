@@ -89,7 +89,9 @@ void myMcp23017Impl::start()
     writeRegister(MCP23017_GPINTENA,inputMask);
     // And use previous value
     writeRegister(MCP23017_INTCONA,0);
-    
+    // Clear pending interrupts if any
+    readRegister(MCP23017_GPIOA);
+    readRegister(MCP23017_GPIOB);
     noInterrupts();        
     pinMode(pinInterrupt,INPUT_PULLUP);
     attachInterrupt(pinInterrupt,_myInterrupt,this,FALLING);    

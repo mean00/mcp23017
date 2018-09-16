@@ -16,7 +16,7 @@ Project("Hello_stm32" C CXX ASM)
 
 print_board_list()
 ADD_DEFINITIONS("-g3 -O0")
-
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(ARDUINO_DEFAULT_BOARD genericSTM32F103C)        # Default Board ID, when not specified
 set(ARDUINO_DEFAULT_PORT ttyACM19) # Default Port, when not specified
 set(ARDUINO_CPU          STM32F103C8)
@@ -40,7 +40,7 @@ SET(libPrefix ${ARDUINO_DEFAULT_BOARD}_)
 #ADD_DEFINITIONS("-ffunction-sections -fdata-sections ")
 generate_arduino_firmware(mcp 
                 SKETCH test.ino
-                SRCS myCode.cpp mcp23017.cpp 
+                SRCS myCode.cpp ${CMAKE_SOURCE_DIR}/../mcp23017.cpp 
                 PORT ${ARDUINO_DEFAULT_PORT}
                 BOARD_CPU ${ARDUINO_CPU}
                 )

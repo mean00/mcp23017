@@ -5,10 +5,11 @@
  ****************************************************/
 
 #include <Wire.h>
-#include "SPI.h"
 #include "mcp23017.h"
 
 myMcp23017 *mcp;
+
+myMcpButtonInput *pushButton;
 
 void mySetup() 
 {
@@ -16,7 +17,9 @@ void mySetup()
     Serial.begin(57600);
     Serial.println("Init"); 
     mcp= myMcp23017::create(PA2);
-    // continue init here
+    // continue init here, add clients
+    pushButton=new myMcpButtonInput(mcp,2); // A2
+    
     
     // then go
     mcp->start();
@@ -29,18 +32,15 @@ void mySetup()
 
 void myLoop(void) 
 {
-#if 0
-    static uint16_t val;
-    mcp->process();
-    delay(10);
-#else
-    static int pin=0;
+    static bool pin=false;
     
-    pin++;
-    mcp->digitalWrite(pin%8,!!(pin&16));
     mcp->process();
+    if(pushButton->changed())
+    {
+        pin=!pin;
+        mcp->digitalWrite(0,pin);
+    }
     delay(100);
     
-#endif
 }
 //-

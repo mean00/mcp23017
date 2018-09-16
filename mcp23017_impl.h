@@ -25,6 +25,13 @@
 #pragma once
 #include <mcp23017.h>
 
+class mcpClientInfo
+{
+public:
+        int         mask;
+        myMcpClient *client;
+};
+
 /**
  * 
  * @param pinInterrupt
@@ -56,20 +63,23 @@ public:
          */
   void      digitalWrite(int pin, bool onoff);
 
-
+  void      registerClient(int mask, myMcpClient *client);
 
  private: 
   uint8_t   readRegister(int addr);
   void      writeRegister(int addr, int value);
-
+   
   
 protected:
     void      init(void);
     WireBase *wire;
     int      i2cAddress;
     int      pinInterrupt;
+    int      inputMask;
     int      PortALatch;
     int      PortBValue;
     bool     changed;
+    mcpClientInfo clients[10];
+    int      nbClients;
   
 };

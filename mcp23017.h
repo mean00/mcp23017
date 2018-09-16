@@ -7,7 +7,9 @@
  * 
  * It is using ARM friendly convention i.e. using "int" as much as possible
  * (c) mean00, BSD License
- 
+ * Datasheet :
+ * http://ww1.microchip.com/downloads/en/DeviceDoc/20001952C.pdf
+ * 
  */
 
 /*************************************************** 
@@ -24,7 +26,6 @@
  ****************************************************/
 #pragma once
 #include <Wire.h>
-
 /**
  * 
  * @param pinInterrupt
@@ -62,4 +63,56 @@ protected:
             }
 
   
+};
+
+class myMcpClient
+{
+public:
+        myMcpClient(myMcp23017 *m)
+        {
+          mcp=m;
+        }        
+        virtual bool process(int pins,int state)=0;
+protected:
+        myMcp23017 *mcp;
+};
+
+/**
+ */
+class myMcpButtonInput : public myMcpClient
+{
+public:
+        myMcpButtonInput(myMcp23017 *mcp, int pin) ;
+        bool process(int pin, int state);
+        bool changed()
+        {
+          return _changed;
+        }
+        bool state()
+        {
+          return _state;
+        }
+protected:
+        int  _pin;
+        bool _state;
+        bool _changed;
+  
+};
+
+
+/**
+ */
+class myMcpRotaryEncoder : public myMcpClient
+{
+public:
+        myMcpRotaryEncoder(myMcp23017 *mcp, int pin1,int pin2) ;
+        bool process(int pin, int state);
+        int count()
+        {
+          return _count;
+        }
+protected:
+        int  _pin1,_pin2;
+        int  _count;
+        int  _state;
 };

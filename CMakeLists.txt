@@ -40,7 +40,7 @@ SET(libPrefix ${ARDUINO_DEFAULT_BOARD}_)
 #ADD_DEFINITIONS("-ffunction-sections -fdata-sections ")
 generate_arduino_firmware(mcp 
                 SKETCH test.ino
-                SRCS myCode.cpp mcp23017.cpp
+                SRCS myCode.cpp mcp23017.cpp 
                 PORT ${ARDUINO_DEFAULT_PORT}
                 BOARD_CPU ${ARDUINO_CPU}
                 )

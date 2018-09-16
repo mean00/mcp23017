@@ -11,13 +11,10 @@
  BSD license, all text above must be included in any redistribution
  ****************************************************/
 
-
 #include "Arduino.h"
 #include "mcp23017.h"
 #include "mcp23017_internal.h"
 #include "mcp23017_impl.h"
-
-static myMcp23017Impl *current=NULL;
 
 /**
  * 
@@ -31,11 +28,10 @@ myMcp23017 *myMcp23017::create(int pinInterrupt, int i2cAdr, WireBase *wire)
     return new myMcp23017Impl(pinInterrupt, i2cAdr,wire);
 }
 
-static void _myInterrupt()
+static void _myInterrupt(void *cookie)
 {
-    if(!current) 
-        return;
-    current->interrupt();
+    myMcp23017Impl *mcp=(myMcp23017Impl *)cookie;
+    mcp->interrupt();
 }
 
 /**
@@ -53,6 +49,7 @@ myMcp23017Impl::myMcp23017Impl(int pinInterrupt,uint8_t addr, WireBase *w)
     if(!wire)
         wire=&Wire;    
     init();
+    
 }
 
 /**
@@ -77,8 +74,9 @@ void myMcp23017Impl::init()
 	// set to gnd by default
         writeRegister(MCP23017_OLATB,0);
         PortBValue=0;
+        nbClients=0;
+        inputMask=0;
         
-        current=this;
 }
 
 /**
@@ -88,13 +86,13 @@ void myMcp23017Impl::init()
 void myMcp23017Impl::start()
 {
     // All interrupt on change for all A
-    writeRegister(MCP23017_GPINTENA,0xff);
+    writeRegister(MCP23017_GPINTENA,inputMask);
     // And use previous value
     writeRegister(MCP23017_INTCONA,0);
     
     noInterrupts();        
     pinMode(pinInterrupt,INPUT_PULLUP);
-    attachInterrupt(pinInterrupt,_myInterrupt,FALLING);    
+    attachInterrupt(pinInterrupt,_myInterrupt,this,FALLING);    
     changed=false;
     interrupts();
     
@@ -121,7 +119,6 @@ void      myMcp23017Impl::digitalWrite(int pin, bool onoff)
 void myMcp23017Impl::interrupt()
 {
     changed=true;
-    detachInterrupt(pinInterrupt);    
 }
 /**
  * 
@@ -134,17 +131,27 @@ void myMcp23017Impl::process()
     interrupts();
     if(!copy) 
         return;
-    // Ok an interrupt occured, process it and re-enable the interrupt
+    // Ok an interrupt occurred, process it 
     
-    // MCP23017_INTCAPA = value when interrupt occured
+    // MCP23017_INTCAPA = value when interrupt occurred
     // MCP23017_GPIOA = value now
     int newValue=readRegister(MCP23017_INTCAPA) ; //MCP23017_INTCAPA);
     if(newValue!=PortALatch)
     {
-        printf("Value change %x\n",newValue^PortALatch);
+        int changed=newValue^PortALatch;
+        for(int i=0;i<nbClients;i++)
+        {
+            int masked=clients[i].mask & changed;
+            if(masked)
+            {
+                clients[i].client->process(masked,newValue);
+                changed &=~masked;
+            }
+            if(!changed)
+                break;
+        }
     }
     PortALatch=newValue;
-    attachInterrupt(pinInterrupt,_myInterrupt,FALLING);    
 }
 
 /**
@@ -173,6 +180,122 @@ void myMcp23017Impl::writeRegister(int regAddr, int regValue)
     wire->endTransmission();
 }
 
+//--
+void      myMcp23017Impl::registerClient(int mask, myMcpClient *client)
+{
+    mcpClientInfo *slot=clients+nbClients;
+    nbClients++;
+    
+    slot->client=client;
+    slot->mask=mask;
+    inputMask|=mask; // Allow interrupts on those pins
+}
+//
+//  Input button
+//
+//
+//
+/**
+ * 
+ * @param mcp
+ * @param pin
+ */
+
+myMcpButtonInput::myMcpButtonInput(myMcp23017 *mcp, int pin) : myMcpClient(mcp)
+{
+          _pin=pin;
+          _state=false;
+          _changed=false;
+          myMcp23017Impl *impl=(myMcp23017Impl *)mcp;
+          impl->registerClient(1<<pin,this);
+}
+/**
+ * 
+ * @param pins
+ * @param states
+ * @return 
+ */
+ bool myMcpButtonInput::process(int pins, int states)
+ {
+     int oldstate=_state;
+     _state=!!(states & (1<<_pin));
+     _changed=(_state != oldstate);
+     return true;
+ }
+//
+//
+//
+//
+ 
+ // Use the full-step state table (emits a code at 00 only)
+#define R_START     0x0
+#define R_CW_FINAL  0x1
+#define R_CW_BEGIN  0x2
+#define R_CW_NEXT   0x3
+#define R_CCW_BEGIN 0x4
+#define R_CCW_FINAL 0x5
+#define R_CCW_NEXT  0x6
+ // Directions
+#define DIR_NONE    0x0
+// Clockwise step.
+#define DIR_CW      0x10
+// Counter-clockwise step.
+#define DIR_CCW     0x20
+ 
+const unsigned char ttable[7][4] = {
+  // R_START
+  {R_START,    R_CW_BEGIN,  R_CCW_BEGIN, R_START},
+  // R_CW_FINAL
+  {R_CW_NEXT,  R_START,     R_CW_FINAL,  R_START | DIR_CW},
+  // R_CW_BEGIN
+  {R_CW_NEXT,  R_CW_BEGIN,  R_START,     R_START},
+  // R_CW_NEXT
+  {R_CW_NEXT,  R_CW_BEGIN,  R_CW_FINAL,  R_START},
+  // R_CCW_BEGIN
+  {R_CCW_NEXT, R_START,     R_CCW_BEGIN, R_START},
+  // R_CCW_FINAL
+  {R_CCW_NEXT, R_CCW_FINAL, R_START,     R_START | DIR_CCW},
+  // R_CCW_NEXT
+  {R_CCW_NEXT, R_CCW_FINAL, R_CCW_BEGIN, R_START},
+};
+ 
+ /**
+  * 
+  * @param mcp
+  * @param pin1
+  * @param pin2
+  */
+ myMcpRotaryEncoder::myMcpRotaryEncoder(myMcp23017 *mcp, int pin1,int pin2): myMcpClient(mcp)
+ {
+     _pin1=pin1;
+     _pin2=pin2;
+     myMcp23017Impl *impl=(myMcp23017Impl *)mcp;
+     impl->registerClient((1<<pin1)+(1<<pin2),this);
+     _state = R_START;
+ }
+/**
+ * 
+ * @param pins
+ * @param states
+ * @return 
+ */
+bool myMcpRotaryEncoder::process(int pins, int states)
+ {
+    int s2=!!(states & (1<<_pin2));
+    int s1=!!(states & (1<<_pin1));
+    
+    int pinstate=(s2<<1) | s1;
+     
+    // Determine new state from the pins and state table.
+    _state = ttable[_state & 0xf][pinstate];
+    // Return emit bits, ie the generated event.
+    switch(_state & 0x30)
+    {
+        case DIR_CW:  _count++;break;
+        case DIR_CCW: _count--;break;
+    }
+    return true;
+ }
 
 // EOF
 

@@ -86,7 +86,9 @@ public:
         bool process(int pin, int state);
         bool changed()
         {
-          return _changed;
+          bool c= _changed;
+          _changed=false;
+          return c;
         }
         bool state()
         {

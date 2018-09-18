@@ -111,7 +111,9 @@ public:
         bool process(int pin, int state);
         int count()
         {
-          return _count;
+          int x= _count;
+          _count=0;
+          return x;
         }
 protected:
         int  _pin1,_pin2;

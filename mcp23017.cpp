@@ -274,6 +274,7 @@ const unsigned char ttable[7][4] = {
      myMcp23017Impl *impl=(myMcp23017Impl *)mcp;
      impl->registerClient((1<<pin1)+(1<<pin2),this);
      _state = R_START;
+     _count=0;
  }
 /**
  * 

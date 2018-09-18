@@ -10,6 +10,7 @@
 myMcp23017 *mcp;
 
 myMcpButtonInput *pushButton;
+myMcpRotaryEncoder *rotary;
 
 void mySetup() 
 {
@@ -28,7 +29,7 @@ void mySetup()
     mcp= myMcp23017::create(PA2);
     // continue init here, add clients
     pushButton=new myMcpButtonInput(mcp,2); // A2
-    
+    rotary=new myMcpRotaryEncoder(mcp,0,1);
     
     // then go
     mcp->start();
@@ -43,11 +44,18 @@ void myLoop(void)
 {
     static bool pin=false;
     static int blk=0;
+    static int counter=10;
+    
     
     for(int i=0;i<10;i++)
     {
         mcp->process();
         delay(10);
+    }
+    int inc=rotary->count();
+    if(inc)
+    {
+        counter+=inc;;
     }
     if(pushButton->changed())
     {
@@ -56,6 +64,9 @@ void myLoop(void)
     }
     mcp->digitalWrite(7,blk&4);
     blk++;
+    {
+        printf("Count=%d\n",counter);
+    }
     
     
 }

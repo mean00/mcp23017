@@ -23,16 +23,11 @@
  * @param wire
  * @return 
  */
-myMcp23017 *myMcp23017::create(int pinInterrupt, int i2cAdr, WireBase *wire)
+myMcp23017 *myMcp23017::create(int i2cAdr, WireBase *wire)
 {
-    return new myMcp23017Impl(pinInterrupt, i2cAdr,wire);
+    return new myMcp23017Impl( i2cAdr,wire);
 }
 
-static void _myInterrupt(void *cookie)
-{
-    myMcp23017Impl *mcp=(myMcp23017Impl *)cookie;
-    mcp->interrupt();
-}
 
 /**
  * 
@@ -41,11 +36,10 @@ static void _myInterrupt(void *cookie)
  * @param Address : A2A1A0 , default is zero, real i2c address is 0x20+addr
  * @param w       : Wire interface, null uses Wire i.e. default i2c
  */
-myMcp23017Impl::myMcp23017Impl(int pinInterrupt,uint8_t addr, WireBase *w)
+myMcp23017Impl::myMcp23017Impl(uint8_t addr, WireBase *w)
 {
     i2cAddress=(addr%8)+MCP23017_BASE_ADDRESS;
     wire=w;
-    this->pinInterrupt=pinInterrupt;
     if(!wire)
         wire=&Wire;    
     init();
@@ -92,11 +86,7 @@ void myMcp23017Impl::start()
     // Clear pending interrupts if any
     readRegister(MCP23017_GPIOA);
     readRegister(MCP23017_GPIOB);
-    noInterrupts();        
-    pinMode(pinInterrupt,INPUT_PULLUP);
-    attachInterrupt(pinInterrupt,_myInterrupt,this,FALLING);    
     changed=false;
-    interrupts();
     
 }
 
@@ -115,26 +105,12 @@ void      myMcp23017Impl::digitalWrite(int pin, bool onoff)
         PortBValue&=~msk;
     writeRegister(MCP23017_OLATB,PortBValue);     
 }
-/**
- * 
- */
-void myMcp23017Impl::interrupt()
-{
-    changed=true;
-}
+
 /**
  * 
  */
 void myMcp23017Impl::process()
 {
-    noInterrupts();       
-    bool copy=changed;
-    changed=false;
-    interrupts();
-    if(!copy) 
-        return;
-    // Ok an interrupt occurred, process it 
-    
     // MCP23017_INTCAPA = value when interrupt occurred
     // MCP23017_GPIOA = value now
     int newValue=readRegister(MCP23017_INTCAPA) ; //MCP23017_INTCAPA);
@@ -205,11 +181,10 @@ void      myMcp23017Impl::registerClient(int mask, myMcpClient *client)
 
 myMcpButtonInput::myMcpButtonInput(myMcp23017 *mcp, int pin) : myMcpClient(mcp)
 {
-          _pin=pin;
-          _state=false;
-          _changed=false;
-          myMcp23017Impl *impl=(myMcp23017Impl *)mcp;
-          impl->registerClient(1<<pin,this);
+    _pin=pin;
+    _state=false;
+    myMcp23017Impl *impl=(myMcp23017Impl *)mcp;
+    impl->registerClient(1<<pin,this);
 }
 /**
  * 
@@ -219,9 +194,10 @@ myMcpButtonInput::myMcpButtonInput(myMcp23017 *mcp, int pin) : myMcpClient(mcp)
  */
  bool myMcpButtonInput::process(int pins, int states)
  {
-     int oldstate=_state;
-     _state=!!(states & (1<<_pin));
-     _changed=(_state != oldstate);
+     int oldstate=_state;          
+     bool newState=!!(states & (1<<_pin));
+     // should be safe with interrupt (?)
+     _state=newState;
      return true;
  }
 //
@@ -292,11 +268,13 @@ bool myMcpRotaryEncoder::process(int pins, int states)
     // Determine new state from the pins and state table.
     _state = ttable[_state & 0xf][pinstate];
     // Return emit bits, ie the generated event.
+    noInterrupts();
     switch(_state & 0x30)
     {
         case DIR_CW:  _count++;break;
         case DIR_CCW: _count--;break;
     }
+    interrupts();
     return true;
  }
 

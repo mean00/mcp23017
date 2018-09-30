@@ -35,7 +35,7 @@
 class myMcp23017 
 {
 public:
-        static myMcp23017 *create(int pinInterrupt, int i2cAdr=0, WireBase *wire=NULL);
+        static myMcp23017 *create(int i2cAdr=0, WireBase *wire=NULL);
   /**
    * Call this frequently so that the internal events are processed
    * It is a bad idea to do i2c under interrupt....
@@ -84,12 +84,6 @@ class myMcpButtonInput : public myMcpClient
 public:
         myMcpButtonInput(myMcp23017 *mcp, int pin) ;
         bool process(int pin, int state);
-        bool changed()
-        {
-          bool c= _changed;
-          _changed=false;
-          return c;
-        }
         bool state()
         {
           return _state;
@@ -97,7 +91,6 @@ public:
 protected:
         int  _pin;
         bool _state;
-        bool _changed;
   
 };
 
@@ -111,8 +104,10 @@ public:
         bool process(int pin, int state);
         int count()
         {
+          noInterrupts();
           int x= _count;
           _count=0;
+          interrupts();
           return x;
         }
 protected:

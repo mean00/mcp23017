@@ -5,7 +5,9 @@ SET(PLATFORM_ARCHITECTURE "STM32F1")
 # while the name will be the name of the folder
 SET(PLATFORM_PATH "/home/fx/Arduino/hardware/arduino/")
 #SET(PLATFORM_TOOLCHAIN_PATH "/home/fx/.arduino15/./packages/arduino/tools/arm-none-eabi-gcc/4.8.3-2014q1/bin")
-SET(PLATFORM_TOOLCHAIN_PATH "/home/fx/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/4.8.3-2014q1/bin/")
+#SET(PLATFORM_TOOLCHAIN_PATH "/home/fx/.arduino15/packages/arduino/tools/arm-none-eabi-gcc/4.8.3-2014q1/bin/")
+#SET(PLATFORM_TOOLCHAIN_PATH "/opt/Atollic_TrueSTUDIO_for_STM32_x86_64_9.0.0/ARMTools/bin/")
+SET(PLATFORM_TOOLCHAIN_PATH "/opt/arm_gcc_2017/gcc-arm-none-eabi-7-2017-q4-major/bin/")
 #"/home/fx/.arduino15/packages/STM32/tools/arm-none-eabi-gcc/6-2017-q2-update/bin")
 # and here we go
 SET(CMAKE_TOOLCHAIN_FILE cmake/ArduinoToolchain.cmake)
@@ -16,6 +18,7 @@ Project("Hello_stm32" C CXX ASM)
 
 print_board_list()
 ADD_DEFINITIONS("-g3 -O0")
+ADD_DEFINITIONS("-D__CORTEX_M=3") # For FreeRTOS
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/..)
 set(ARDUINO_DEFAULT_BOARD genericSTM32F103C)        # Default Board ID, when not specified
 set(ARDUINO_DEFAULT_PORT ttyACM19) # Default Port, when not specified

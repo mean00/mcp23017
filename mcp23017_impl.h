@@ -41,7 +41,7 @@ public:
 class myMcp23017Impl: public myMcp23017
 {
 public:
-            myMcp23017Impl(int pinInterrupt,uint8_t addr=0, WireBase *w=NULL);
+            myMcp23017Impl(uint8_t addr=0, WireBase *w=NULL);
   void      interrupt();
   /**
    * Call this frequently so that the internal events are processed

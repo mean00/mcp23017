@@ -183,6 +183,7 @@ myMcpButtonInput::myMcpButtonInput(myMcp23017 *mcp, int pin) : myMcpClient(mcp)
 {
     _pin=pin;
     _state=false;
+    _toggle=false;
     myMcp23017Impl *impl=(myMcp23017Impl *)mcp;
     impl->registerClient(1<<pin,this);
 }
@@ -196,8 +197,15 @@ myMcpButtonInput::myMcpButtonInput(myMcp23017 *mcp, int pin) : myMcpClient(mcp)
  {
      int oldstate=_state;          
      bool newState=!!(states & (1<<_pin));
-     // should be safe with interrupt (?)
-     _state=newState;
+     noInterrupts();
+     if(oldstate==true && newState==false) // falling edge
+     {
+            
+            _toggle^=1;
+            _changed=true;
+     }
+     _state=newState; // disable interrupts ?
+     interrupts();
      return true;
  }
 //

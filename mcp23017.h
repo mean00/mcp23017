@@ -85,12 +85,20 @@ public:
         myMcpButtonInput(myMcp23017 *mcp, int pin) ;
         bool process(int pin, int state);
         bool state()
+        {          
+          return _toggle;
+        }
+        bool changed()
         {
-          return _state;
+          bool r=_changed;
+          _changed=false;
+          return r;
         }
 protected:
+        bool _toggle;
         int  _pin;
         bool _state;
+        bool _changed;
   
 };
 
